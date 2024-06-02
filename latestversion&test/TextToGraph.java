@@ -1,5 +1,14 @@
+import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
+import org.jgrapht.graph.DefaultDirectedWeightedGraph;
+import org.jgrapht.graph.DefaultEdge;
+
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -9,17 +18,21 @@ import java.util.Random;
 import java.util.Scanner;
 
 public class TextToGraph {
-    static final int MAX_WORDS = 10000; // 假设最多有10000个不同的单词
+    static final int MAX_WORDS = 10000;  // 假设最多有10000个不同的单词
     static int[] wordIds = new int[MAX_WORDS]; // 存储单词到ID的映射
     static int[][] graph = new int[MAX_WORDS][MAX_WORDS]; // 存储图的邻接矩阵，权值表示边的权重
     static int nextWordId = 0; // 用于分配下一个单词的ID
     static String[] idToWord = new String[MAX_WORDS]; // ID到单词的映射，便于输出时查找
+    static String readDOTFilePath = "C:\\Users\\LENOVO\\Desktop\\L1\\output\\demo.dot";
+    static String storePNGFilePath = "C:\\Users\\LENOVO\\Desktop\\L1\\output\\graph.png";
+    static String enhanceDOTFilePath = "C:\\Users\\LENOVO\\Desktop\\L1\\output\\enhanceDOT.dot";
+    static String enhanceStorePNGFilePath = "C:\\Users\\LENOVO\\Desktop\\L1\\output\\enhanceGraph.png";
+    static String DOTString = "C:\\Users\\LENOVO\\Desktop\\L1\\static\\Graphviz-11.0.0-win64\\bin\\dot.exe";
 
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        System.out.println("请输入要读取的文本文件的完整路径和文件名：");
-        // String fileName = scanner.nextLine();
-        String fileName = "C:\\Users\\Jy\\Desktop\\read.txt";
+        System.out.println("请输入要读取的文本文件的完整路径和文件名：");// 不带引号
+        String fileName = scanner.nextLine();
         readFileAndBuildGraph(fileName);// 读文件、建立图结构
 
         while (true) {
@@ -28,9 +41,13 @@ public class TextToGraph {
             switch (choice) {
                 case 1:
                     displayDirectedGraph();// 这个方法目前的实现是俺用来测试文本读取对不对的，没真的生成图
-                    // showDirectedGraph; // 展示有向图，这个方法（即函数）的参数是可以调整的，见ppt；
+                    showDirectedGraph(); // 展示有向图，这个方法（即函数）的参数是可以调整的，见ppt；
+                    // 附加内容：将生成的有向图以图像文件形式保存到磁盘
                     break;
                 case 2:
+                    // 定义变量类型名称，提示用户输入形式
+                    // queryBridgeWords(); // 查询桥接词，具体参数和返回值类型见ppt
+                    // 选择合适的格式输出
                     System.out.println("请输入两个单词以查询桥接词（用空格分隔）：");
                     String word1 = scanner.next();
                     String word2 = scanner.next();
@@ -38,6 +55,9 @@ public class TextToGraph {
                     System.out.println(result);
                     break;
                 case 3:
+                    // 定义变量类型名称，提示用户输入形式
+                    //generateNewText(); // 生成新文本，具体参数和返回值类型见ppt
+                    // 选择合适的格式输出
                     System.out.println("请输入新文本以生成桥接词增强版文本：");
                     scanner.nextLine();
                     String inputText = scanner.nextLine();
@@ -47,16 +67,28 @@ public class TextToGraph {
                     break;
                 case 4:
                     // 定义变量类型名称，提示用户输入形式
-                    // calcShortestPath(); // 权值最短路径，需要实现，具体参数和返回值类型见ppt
-                    // 含突出显示的图像输出
-                    // 附加内容为：①用不同的突出显示的图像输出来展示多条最短路径 ② case 5
+                    System.out.println("请输入两个单词，使用换行分割:");
+                    try {
+                        String from = scanner.next();
+                        String to = scanner.next();
+                        calcShortestPath(from, to); // 权值最短路径，需要实现，具体参数和返回值类型见ppt
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
                     break;
                 case 5:
                     // 定义变量类型名称，提示用户输入形式
+                    System.out.println("请输入一个单词，将会计算最短距离：");
+                    String userInput = scanner.next();
+                    calShortestPath(userInput.toLowerCase());
                     // 计算一个单词的最短路径(); // 一个输入参数，然后遍历其他单词，调用calcShortestPath(该单词，被遍历的单词)即可
                     // 选择合适的格式输出（感觉这里就可以直接文字输出，不然也太复杂了）
                     break;
                 case 6:
+                    // 定义变量类型名称，不需要输入
+                    // randomWalk(); // 随机游走，具体参数和返回值类型见ppt
+                    // 文件形式输出
                     System.out.println("Starting random walk. Type 'stop' to save the path and exit.");
                     String walkResult = randomWalk();
                     break;
@@ -111,7 +143,8 @@ public class TextToGraph {
         }
     }
 
-    // 根据单词获取其ID，如果不在表内，返回-1
+    // 根据单词获取其ID，如果单词尚未分配ID，则为其分配一个新的ID。
+    // 输入需要获取或者分配ID的单词，输出ID。
     private static int getWordId(String word) {
         // 遍历已有的单词ID列表
         for (int i = 0; i < nextWordId; i++) {
@@ -131,7 +164,6 @@ public class TextToGraph {
         return nextWordId++; // 返回新分配的ID并递增计数器
     }
 
-
     private static void displayDirectedGraph() {
         System.out.println("有向图结构:");
         // 遍历所有已分配ID的单词
@@ -146,6 +178,141 @@ public class TextToGraph {
             System.out.println("}");
         }
     }
+
+    /**
+     * 生成有向图
+     */
+    private static void showDirectedGraph() {
+        // 生成DOT文件内容
+        String dot = "digraph G {\n";
+        for (int i = 0; i < nextWordId; i++) {
+            for (int j = 0; j < nextWordId; j++) {
+                if (graph[i][j] > 0) {
+                    dot += (idToWord[i] + " -> " + idToWord[j] + " [label=\"" + graph[i][j] + "\"];\n");
+                }
+            }
+        }
+        dot += "}";
+        try (BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(readDOTFilePath))) {
+            bufferedWriter.write(dot);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        generatePNG(readDOTFilePath, storePNGFilePath);
+    }
+
+    private static void calcShortestPath(String from, String to) {
+        DefaultDirectedWeightedGraph<String, DefaultEdge> directedWeightedGraph =
+                new DefaultDirectedWeightedGraph<>(DefaultEdge.class);
+
+        // 加顶点
+        for (int i = 0; i < nextWordId; i++) {
+            directedWeightedGraph.addVertex(idToWord[i]);
+        }
+
+        for (int i = 0; i < nextWordId; i++) {
+            for (int j = 0; j < nextWordId; j++) {
+                if (graph[i][j] > 0) {
+                    // 加权值
+                    DefaultEdge edge1 = directedWeightedGraph.addEdge(idToWord[i], idToWord[j]);
+                    directedWeightedGraph.setEdgeWeight(edge1, graph[i][j]);
+                }
+            }
+        }
+
+        DijkstraShortestPath<String, DefaultEdge> dijkstraAlg = new DijkstraShortestPath<>(directedWeightedGraph);
+        double shortestPath = dijkstraAlg.getPathWeight(from, to);
+        if (Double.isInfinite(shortestPath)) {
+            System.out.println("无法到达");
+            return;
+        }
+        List<DefaultEdge> path = dijkstraAlg.getPath(from, to).getEdgeList();
+
+        // 打印路径和总权重
+        System.out.println("最短路径从" + from + "到" + to + "：");
+        for (DefaultEdge edge : path) {
+            System.out.println(directedWeightedGraph.getEdgeSource(edge) + " -> " + directedWeightedGraph.getEdgeTarget(edge));
+        }
+        System.out.println("总权重：" + shortestPath);
+
+        // 定义一个正则表达式来匹配想要提取的部分
+        String regex = "(\\w+)\\s*->\\s*(\\w+)";
+
+        // 编译正则表达式
+        Pattern pattern = Pattern.compile(regex);
+
+        try (BufferedReader reader = Files.newBufferedReader(Paths.get(readDOTFilePath));
+             BufferedWriter writer = Files.newBufferedWriter(Paths.get(enhanceDOTFilePath))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // 创建匹配器
+                Matcher matcher = pattern.matcher(line);
+                if (matcher.find()) {
+                    String part1 = matcher.group(1);
+                    String part2 = matcher.group(2);
+                    for (DefaultEdge edge : path) {
+                        if (part1.equals(directedWeightedGraph.getEdgeSource(edge)) && part2.equals(directedWeightedGraph.getEdgeTarget(edge))) {
+                            line = line.replace("]", ", color=\"red\", penwidth=3.0]");
+                        }
+                    }
+                }
+                writer.write(line);
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        generatePNG(enhanceDOTFilePath, enhanceStorePNGFilePath);
+    }
+
+    private static void generatePNG(String DOTFile, String PNGFile) {
+        // 生成对应的图片
+        String command = DOTString + " -Tpng " + DOTFile + " -o " + PNGFile;
+        try {
+            Runtime.getRuntime().exec(command);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println("生成的有向图的路径在: `" + PNGFile + "` ");
+    }
+
+    public static void calShortestPath(String from){
+        int fromID = -1;
+        for (int i = 0; i < idToWord.length; i++) {
+            if (idToWord[i].equals(from)){
+                fromID = i;
+                break;
+            }
+        }
+        if (fromID == -1) {
+            System.out.println("不存在你输入的端点");
+            return;
+        }
+
+        int shortest = Integer.MAX_VALUE;
+        ArrayList<Integer> shortestPath = new ArrayList<>();
+
+        for (int i = 0; i < nextWordId; i++) {
+            if (graph[fromID][i] > 0){
+                if (graph[fromID][i] < shortest){
+                    shortestPath.clear();
+                    shortest = graph[fromID][i];
+                    shortestPath.add(i);
+                } else if (graph[fromID][i] == shortest) {
+                    shortestPath.add(i);
+                }
+            }
+        }
+
+        System.out.println("最短距离是：" + shortest + "\n分别有以下终点：");
+        for (int i = 0; i < shortestPath.size(); i++) {
+            System.out.println(idToWord[shortestPath.get(i)]);
+        }
+
+    }
+
 
     // 查询桥接词的函数实现
     private static String queryBridgeWords(String word1, String word2) {
@@ -240,7 +407,7 @@ public class TextToGraph {
             String input = scanner.nextLine();
             if (input.equals("stop")) {
                 // 写入路径到文件
-                try (PrintWriter out = new PrintWriter(new FileWriter("C:\\Users\\Jy\\Desktop\\random.txt"))) {
+                try (PrintWriter out = new PrintWriter(new FileWriter("C:\\Users\\LENOVO\\Desktop\\L1\\output\\random.txt"))) {
                     out.println(pathBuilder.toString());
                 } catch (IOException e) {
                     System.err.println("Error writing file: " + e.getMessage());
@@ -269,7 +436,7 @@ public class TextToGraph {
                     pathBuilder.append(idToWord[currentRandomWordId]).append(" "); // 将当前单词加入路径中
                     System.out.println("Current path: " + pathBuilder.toString());
                     System.out.println("This edge has been followed. Ending random walk.");
-                    try (PrintWriter out = new PrintWriter(new FileWriter("C:\\Users\\Jy\\Desktop\\random.txt"))) {
+                    try (PrintWriter out = new PrintWriter(new FileWriter("C:\\Users\\LENOVO\\Desktop\\L1\\output\\random.txt"))) {
                         out.println(pathBuilder.toString());
                     } catch (IOException e) {
                         System.err.println("Error writing file: " + e.getMessage());
@@ -280,7 +447,7 @@ public class TextToGraph {
                 // 如果候选列表为空，则游走结束
                 System.out.println("No more edges to follow. Ending random walk.");
                 // 写入路径到文件
-                try (PrintWriter out = new PrintWriter(new FileWriter("C:\\Users\\Jy\\Desktop\\random.txt"))) {
+                try (PrintWriter out = new PrintWriter(new FileWriter("C:\\Users\\LENOVO\\Desktop\\L1\\output\\random.txt"))) {
                     out.println(pathBuilder.toString());
                 } catch (IOException e) {
                     System.err.println("Error writing file: " + e.getMessage());
@@ -292,3 +459,5 @@ public class TextToGraph {
     }
 
 }
+
+
